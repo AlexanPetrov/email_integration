@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Message List</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+      table,
+      th,
+      td {
+        border: 1px solid black;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      .progress-bar {
+        width: 100%;
+        background-color: #f3f3f3;
+        border: 1px solid #ccc;
+        margin-bottom: 20px;
+      }
+      .progress {
+        width: 0%;
+        height: 30px;
+        background-color: #4caf50;
+        text-align: center;
+        line-height: 30px;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Message List</h1>
+    <div class="progress-bar">
+      <div class="progress">Чтение сообщений</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Тема сообщения</th>
+          <th>Дата отправки</th>
+          <th>Дата получения</th>
+          <th>Описание или текст сообщения</th>
+          <th>Прикрепленные файлы</th>
+        </tr>
+      </thead>
+      <tbody id="message-table-body">
+        {% for message in messages %}
+        <tr>
+          <td>{{ message.id }}</td>
+          <td>{{ message.subject }}</td>
+          <td>{{ message.sent_date }}</td>
+          <td>{{ message.received_date }}</td>
+          <td>{{ message.body|truncatechars:100 }}</td>
+          <td>{{ message.attachments }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <script>
+      // Set up WebSocket connection for real-time progress updates
+      const socket = new WebSocket(
+        "ws://" + window.location.host + "/ws/progress/"
+      );
+
+      socket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+        document.querySelector(".progress").style.width = data.progress + "%";
+        document.querySelector(".progress").innerText =
+          data.progress.toFixed(2) + "%";
+      };
+
+      socket.onclose = function (e) {
+        console.error("WebSocket closed unexpectedly");
+      };
+
+      socket.onerror = function (e) {
+        console.error("WebSocket error:", e);
+      };
+
+      socket.onopen = function (e) {
+        console.log("WebSocket connection established");
+      };
+
+      // Function to update the progress bar dynamically
+      function updateProgress() {
+        fetch("/email-progress/")
+          .then((response) => response.json())
+          .then((data) => {
+            document.querySelector(".progress").style.width =
+              data.progress + "%";
+            document.querySelector(".progress").innerText =
+              data.progress.toFixed(2) + "%";
+          });
+      }
+
+      // Function to fetch and update messages dynamically
+      function fetchMessages() {
+        fetch("/fetch-emails/")
+          .then((response) => response.json())
+          .then((data) => {
+            let tbody = document.getElementById("message-table-body");
+            tbody.innerHTML = "";
+            data.messages.forEach((message) => {
+              let row = `<tr>
+                            <td>${message.id}</td>
+                            <td>${message.subject}</td>
+                            <td>${message.sent_date}</td>
+                            <td>${message.received_date}</td>
+                            <td>${message.body.substring(0, 100)}</td>
+                            <td>${message.attachments.join(", ")}</td>
+                        </tr>`;
+              tbody.innerHTML += row;
+            });
+          });
+      }
+
+      // Set intervals for updating progress and fetching messages
+      setInterval(updateProgress, 5000); // Update progress every 5 seconds
+      setInterval(fetchMessages, 10000); // Fetch messages every 10 seconds
+    </script>
+  </body>
+</html>
